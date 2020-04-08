@@ -1,0 +1,6 @@
+---
+# defaults file for adminer
+
+adminer_ver: 4.7.5
+adminer_path: '/usr/share/adminer' # set path for adminer
+adminer_css_theme_url: '' # Alternative designs. For more details: https://www.adminer.org/#extras

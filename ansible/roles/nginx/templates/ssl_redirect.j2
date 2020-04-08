@@ -1,0 +1,33 @@
+server
+{
+    include     ports/http.conf;
+    server_name {{ item.server_name }};
+
+    return      {% if (item.redirect_code is defined) %}{{item.redirect_code}}{% else %}301{% endif %} {% if (item.redirect_schema is defined) %}{{item.redirect_schema}}{% else %}http{% endif %}://{{ item.redirect_to_domain }}$request_uri;
+}
+server
+{
+    include     ports/ssl.conf;
+    server_name {{ item.server_name }};
+
+    include enable/ssl.conf;
+    {% if (item.path_to_ssl_certificate_file is defined) %}
+        ssl_certificate    {{ item.path_to_ssl_certificate_file }};
+	{% else %}
+        ssl_certificate    {{ nginx_certs_folder }}{{ item.ssl_certificate_file }};
+    {% endif %}
+
+    {% if (item.path_to_ssl_certificate_key_file is defined) %}
+        ssl_certificate_key    {{ item.path_to_ssl_certificate_key_file }};
+    {% else %}
+        ssl_certificate_key {{ nginx_certs_folder }}{{ item.ssl_certificate_key_file }};
+    {% endif %}
+
+    {% if (item.path_to_ssl_dhparam_file is defined) %}
+        ssl_dhparam    {{ item.path_to_ssl_dhparam_file }};
+	{% else %}
+        ssl_dhparam    {{ nginx_certs_folder }}{{ item.ssl_dhparam_file }};
+    {% endif %}
+
+    return      {% if (item.redirect_code is defined) %}{{item.redirect_code}}{% else %}301{% endif %} {% if (item.redirect_schema is defined) %}{{item.redirect_schema}}{% else %}http{% endif %}://{{ item.redirect_to_domain }}$request_uri;
+}

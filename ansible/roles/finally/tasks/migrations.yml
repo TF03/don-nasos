@@ -1,0 +1,3 @@
+- name: run migrations
+  shell: removes={{project_folder}}/core/shell chdir={{project_folder}}/core/ php shell migrateall --interactive=0
+  when: migrate_db

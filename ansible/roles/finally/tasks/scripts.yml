@@ -1,0 +1,12 @@
+- name: Creates Storage directory
+  file: path="{{ item }}" state=directory owner=www-data group=www-data mode=0775
+  with_items:
+    - '/var/www/storage'
+    - '/var/www/storage/hourlyReport'
+
+- name: Link Email resources
+  file: state=link src="{{project_folder}}/apps/admin/client/styles/images" dest=/var/www/storage/email
+
+#- name: Clean Up Production Data
+#  shell: removes="{{ project_folder }}/core/shell" chdir="{{ project_folder }}/core/" php shell cleanup "{{ hostname }}"
+#  when: not is_production

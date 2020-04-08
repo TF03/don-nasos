@@ -1,0 +1,45 @@
+---
+# tasks file for mysql
+
+- name: ensure MySQL is installed
+  action: apt pkg="{{ item }}" state=present
+  with_items:
+      - mysql-client
+      - mysql-server
+      - python-psycopg2
+      - libpq-dev
+      - python-mysqldb
+
+- name: ensure MySQL is installed
+  action: apt pkg="{{ item }}" state=present
+  with_items:
+    - python3-pymysql
+  when: ansible_distribution == "Ubuntu" and ansible_distribution_version == "18.04"
+
+- name: copy mysqld.cnf
+  template: src="{{ mysqld_config_src_file }}" dest=/etc/mysql/mysql.conf.d/mysqld.cnf owner=root mode=0644
+
+- name: copy MySQL root pass config
+  template: src="{{ mysql_root_pass_config_src_file }}" dest=/root/my.cnf owner=root mode=0644
+
+- name: service MySQL
+  service: name=mysql state=started enabled=yes
+
+- name: set mysql root password
+  command: /usr/bin/mysqladmin -u root password '{{ mysql_root_pass }}'
+  ignore_errors: yes
+  when: ansible_distribution == "Ubuntu" and (ansible_distribution_version == "16.04" or ansible_distribution_version == "14.04")
+
+- name: set mysql root password
+  command: mysql -u root --execute="ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '"{{ mysql_root_pass }}"';"
+  when: ansible_distribution == "Ubuntu" and ansible_distribution_version == "18.04"
+
+- name: remove the MySQL test database
+  mysql_db: name=test state=absent login_user=root login_password={{ mysql_root_pass }}
+
+- name: add mysql app user
+  mysql_user: name="{{ mysql_app_user }}" password="{{ mysql_app_pass }}" priv=*.*:ALL state=present login_user=root login_password="{{ mysql_root_pass }}"
+
+- name: add mysql databases
+  mysql_db: name="{{ item }}" state=present login_user="{{ mysql_app_user }}" login_password="{{ mysql_app_pass }}" encoding="{{ mysql_database_encoding }}" collation="{{ mysql_database_collation }}"
+  with_items: "{{ mysql_databases }}"

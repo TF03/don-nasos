@@ -1,0 +1,12 @@
+---
+logrotate_scripts: []
+logrotate_dir: /etc/logrotate.d/
+logrotate_frequency: daily  # daily | weekly | monthly
+logrotate_missingok: true
+logrotate_files_num: 30
+logrotate_compress: true
+logrotate_delaycompress: true
+logrotate_copytruncate: true
+logrotate_notifempty: true
+logrotate_sharedscripts: true
+logrotate_chmod: 0640 www-data www-data

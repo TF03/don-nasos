@@ -1,0 +1,29 @@
+---
+- set_fact: adminer_installed=0
+- set_fact: installed_correct_adminer_version=0
+
+- name: determine current adminer version
+  shell: cat "{{ adminer_path }}"/index.php | grep @version | awk -F '@version' '{print$2}' |  tr -d '[:space:]'
+  register: current_adminer_version
+
+- set_fact: adminer_installed=1
+  when: not current_adminer_version.stderr
+
+- set_fact: installed_correct_adminer_version=1
+  when: current_adminer_version.stdout == adminer_ver
+
+- stat: path="{{ adminer_path }}"
+  register: adminer_dir_exists
+
+- name: prepare dir for Adminer
+  file: path="{{ adminer_path }}" state=directory
+  when: not adminer_dir_exists.stat.exists
+
+- name: download Adminer
+  get_url: dest="{{ adminer_path }}/index.php" mode=0644 url="https://github.com/vrana/adminer/releases/download/v{{ adminer_ver }}/adminer-{{ adminer_ver }}.php" force=yes
+  when: installed_correct_adminer_version == '0'
+
+- name: download Adminer css theme
+  get_url: dest="{{ adminer_path }}/adminer.css" mode=0644 url="{{ adminer_css_theme_url }}"
+  when: (adminer_css_theme_url is defined)
+  ignore_errors: true

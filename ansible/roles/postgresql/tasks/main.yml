@@ -1,0 +1,186 @@
+---
+# tasks file for pgsql
+
+- set_fact: pgsql_installed=0
+- set_fact: installed_correct_pgsql_version=0
+
+- name: Copy to server the Postgres version checker
+  copy:
+    src: checkPostgresVersion.sh
+    dest: /usr/local/bin/checkPostgresVersion.sh
+    mode: '0755'
+
+- name: determine current pgsql version
+  shell: /usr/local/bin/checkPostgresVersion.sh
+  register: current_pgsql_version
+  ignore_errors: True
+
+- set_fact: pgsql_installed=1
+  when: not current_pgsql_version.stderr
+
+- set_fact: installed_correct_pgsql_version=1
+  when: current_pgsql_version.stdout == "{{ pgdb_version }}"
+
+- name: Create backup and upload to S3
+  shell: /root/backup.sh
+  when: (pgsql_installed == '1') and (installed_correct_pgsql_version == '0') and (is_dev != true)
+
+- name: Create directory for sql_dumps
+  file: path="/tmp/pg_dump/{{ pgdb_project_name }}/" state=directory owner=postgres mode=600
+  when: (pgsql_installed == '1') and (installed_correct_pgsql_version == '0')
+
+- name: Create pgpass file
+  template: src=pgpass.j2 dest=/tmp/.pgpass owner=postgres mode=600
+  when: (pgsql_installed == '1') and (installed_correct_pgsql_version == '0')
+
+- name: Get list of databases for backup
+  shell: "PGPASSFILE=/tmp/.pgpass psql -h {{ pgdb_host }} -U {{ pgdb_sudo_user }}  -p {{ pgdb_port }} -At -c 'select datname from pg_database where not datistemplate and datallowconn order by datname;' postgres;"
+  register: pgsql_dump_tables
+  when: (pgsql_installed == '1') and (installed_correct_pgsql_version == '0')
+
+- name: Create PostgreSQL Dump
+  shell: "PGPASSFILE=/tmp/.pgpass pg_dump {{ item }} -h {{ pgdb_host }} -U {{ pgdb_sudo_user }} -p {{ pgdb_port }} -f '/tmp/pg_dump/{{ pgdb_project_name }}/{{ item }}.sql'"
+  when: (pgsql_installed == '1') and (installed_correct_pgsql_version == '0')
+  with_items: "{{ pgsql_dump_tables.stdout_lines|default([]) }}"
+
+- name: Delete Old PostgreSQL
+#  become: true
+  apt:
+    name: "{{ item }}"
+    state: absent
+    purge: yes
+    force: yes
+  with_items:
+    - "postgresql-{{ current_pgsql_version.stdout }}"
+    - "postgresql-client-{{ current_pgsql_version.stdout }}"
+    - "postgresql-client-common"
+  when: (pgsql_installed == '1') and (installed_correct_pgsql_version == '0')
+
+- name: Add Keys for PostgreSQL Repository
+  become: yes
+  apt_key:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    state: present
+  when: pgsql_installed == '0'
+
+- name: Add PostgreSQL Repository
+  become: yes
+  apt_repository:
+    repo: "deb http://apt.postgresql.org/pub/repos/apt/ {{ansible_distribution_release}}-pgdg main"
+    state: present
+  when: pgsql_installed == '0'
+
+- name: Update apt
+  become: yes
+  apt:
+    update_cache: yes
+  when: (pgsql_installed == '0') or ((pgsql_installed == '1') and (installed_correct_pgsql_version == '0'))
+
+- name: Install PostgreSQL Packages
+  become: yes
+  apt:
+    name: "{{ item }}"
+    state: latest
+  with_items:
+    - libpq-dev
+    - "postgresql-{{ pgdb_version }}"
+    - "postgresql-client-{{ pgdb_version }}"
+    - python-pygresql
+    - python-psycopg2
+  when: (pgsql_installed == '0') or ((pgsql_installed == '1') and (installed_correct_pgsql_version == '0'))
+
+- name: be sure PostgreSQL is running
+  systemd:
+    enabled: yes
+    name: postgresql
+    state: restarted
+    daemon_reload: yes
+  when: ansible_distribution == "Ubuntu" and (ansible_distribution_version == "16.04" or ansible_distribution_version == "18.04")
+
+- name: be sure PostgreSQL is running
+  service:
+    name: postgresql
+    state: restarted
+    enabled: yes
+  when: ansible_distribution == "Ubuntu" and ansible_distribution_version == "14.04"
+
+- name: set postgres password
+  shell: sudo -u postgres psql -c "ALTER USER {{ pgdb_sudo_user }} PASSWORD '{{ postgres_pass }}';"
+  when: postgres_pass != ''
+
+- name: Create databases
+  become: yes
+  become_user: "{{ pgdb_sudo_user }}"
+  postgresql_db:
+    name: "{{ pgdb_database }}"
+    state: present
+
+- name: Create users
+  become: yes
+  become_user: "{{ pgdb_sudo_user }}"
+  postgresql_user:
+    name: "{{ pgdb_user }}"
+    password: "{{ pgdb_password }}"
+    db: "{{ pgdb_database }}"
+    priv: ALL
+    encrypted: yes
+
+- name: Make smarttab role as superuser
+  become: yes
+  become_user: "{{ pgdb_sudo_user }}"
+  shell: psql -c "ALTER ROLE {{ pgdb_user }} SUPERUSER;"
+  when: is_dev
+
+- name: copy PostgreSQL config
+  template:
+    src: "{{ pgdb_conf_src_file }}"
+    dest: "/etc/postgresql/{{pgdb_version}}/main/postgresql.conf"
+    owner: postgres
+    group: postgres
+    mode: 0644
+
+- name: copy PostgreSQL tuning config
+  template:
+    src: "configs/postgresql/{{ pgdb_version }}/{{ ec2_instance_type }}.conf"
+    dest: "/etc/postgresql/{{pgdb_version}}/main/conf.d/tuning.conf"
+    owner: postgres
+    group: postgres
+    mode: 0644
+  ignore_errors: true
+
+- name: Create databases from dump list
+  become: yes
+  become_user: "{{ pgdb_sudo_user }}"
+  postgresql_db:
+    name: "{{ item }}"
+    state: present
+  when: (pgsql_installed == '1') and (installed_correct_pgsql_version == '0')
+  with_items: "{{ pgsql_dump_tables.stdout_lines|default([]) }}"
+
+- name: Restore PostgreSQL Dump
+  shell: "PGPASSFILE=/tmp/.pgpass psql -d {{ item }} -h {{ pgdb_host }} -U {{ pgdb_sudo_user }} -p {{ pgdb_port }} < '/tmp/pg_dump/{{ pgdb_project_name }}/{{ item }}.sql'"
+  when: (pgsql_installed == '1') and (installed_correct_pgsql_version == '0')
+  with_items: "{{ pgsql_dump_tables.stdout_lines|default([]) }}"
+
+- name: be sure PostgreSQL postgresql.service is running
+  systemd:
+    name: postgresql.service
+    state: restarted
+    enabled: yes
+    daemon_reload: yes
+  when: ansible_distribution == "Ubuntu" and ansible_distribution_version >= "16.04"
+
+- name: be sure PostgreSQL main.service is running
+  systemd:
+    name: postgresql@{{pgdb_version}}-main.service
+    state: restarted
+    enabled: yes
+    daemon_reload: yes
+  when: ansible_distribution == "Ubuntu" and ansible_distribution_version >= "16.04"
+
+- name: be sure PostgreSQL is running
+  service:
+    name: postgresql
+    state: restarted
+    enabled: yes
+  when: ansible_distribution == "Ubuntu" and ansible_distribution_version == "14.04"

@@ -1,0 +1,109 @@
+---
+# tasks file for xdebug
+
+- set_fact:
+    php7_dir_exists: false
+    php5_fpm_dir_exists: false
+    php5_apache2_dir_exists: false
+    php5_cli_dir_exists: false
+
+- name: detect php version
+  shell: chdir=/tmp php -v | grep -Eow '^PHP [^ ]+'| awk '{ print $2 }' | awk -F '-' '{print $1}'
+  register: php_version_command
+
+- set_fact: php_version={{php_version_command.stdout}}
+
+- shell: if [ -d /etc/php/7.* ]; then return 0; else return 1; fi
+  register: php7_dir_exists_command
+  ignore_errors: true
+
+- set_fact: php7_dir_exists={{php7_dir_exists_command.rc == 0}}
+
+- shell: if [ -d /etc/php5/fpm/conf.d/ ]; then return 0; else return 1; fi
+  register: php5_fpm_dir_exists_command
+  ignore_errors: true
+
+- set_fact: php5_fpm_dir_exists={{php5_fpm_dir_exists_command.rc == 0}}
+
+- shell: if [ -d /etc/php5/apache2/conf.d/ ]; then return 0; else return 1; fi
+  register: php5_apache2_dir_exists_command
+  ignore_errors: true
+
+- set_fact: php5_apache2_dir_exists={{php5_apache2_dir_exists_command.rc == 0}}
+
+- shell: if [ -d /etc/php5/cli/conf.d/ ]; then return 0; else return 1; fi
+  register: php5_cli_dir_exists_command
+  ignore_errors: true
+
+- set_fact: php5_cli_dir_exists={{php5_cli_dir_exists_command.rc == 0}}
+
+- name: download xdebug extension
+  get_url: url={{xdebug_download_url}}xdebug-{{xdebug_version}}.tgz dest=/tmp/xdebug.tgz force=yes timeout=60
+
+- name: extract xdebug
+  shell: chdir=/tmp tar -xf xdebug.tgz
+
+- name: compile xdebug
+  shell: chdir=/tmp/xdebug-{{xdebug_version}}/  phpize && ./configure && make && make install
+
+- name: find xdebug.so
+  shell: find /usr/lib -name xdebug.so | head -n 1
+  register: xdebug_module_path
+
+- name: install Xdebug for php 5.5 and greater
+  template: src="{{ xdebug_template_src_file }}" dest=/etc/php5/mods-available/xdebug.ini mode=0644
+  when: php_version | version_compare('5.5', operator='>=' ) and php_version | version_compare('7.0', operator='<' )
+
+- name: install Xdebug for php 5.5 and greater (Apache2)
+  shell: creates=/etc/php5/apache2/conf.d/redis.ini ln -s /etc/php5/mods-available/redis.ini /etc/php5/apache2/conf.d/
+  when: php_version | version_compare('5.5', operator='>=' ) and php_version | version_compare('7.0', operator='<' ) and php5_apache2_dir_exists
+  notify:
+    - restart apache
+
+- name: install Xdebug for php 5.5 and greater (PHP-FPM)
+  shell: creates=/etc/php5/fpm/conf.d/xdebug.ini ln -s /etc/php5/mods-available/xdebug.ini /etc/php5/fpm/conf.d/
+  when: php_version | version_compare('5.5', operator='>=' ) and php_version | version_compare('7.0', operator='<' ) and php5_fpm_dir_exists
+  notify:
+    - restart php5-fpm
+
+- name: install Xdebug for php 5.5 and greater (PHP CLI)
+  shell: creates=/etc/php5/cli/conf.d/xdebug.ini ln -s /etc/php5/mods-available/xdebug.ini /etc/php5/cli/conf.d/
+  when: php_version | version_compare('5.5', operator='>=' ) and php_version | version_compare('7.0', operator='<' ) and php5_cli_dir_exists
+
+- name: install Xdebug for php lower than 5.5 (5.3 - 5.4)
+  template: src="{{ xdebug_template_src_file }}" dest=/etc/php5/conf.d/xdebug.ini mode=0644
+  when: php_version | version_compare('5.5', operator='<' )
+  notify:
+    - restart php5-fpm
+    - restart apache
+
+- name: install Xdebug for php 7.0 and greater
+  template: src="{{ xdebug_template_src_file }}" dest=/etc/php/7.0/mods-available/xdebug.ini mode=0644
+  when: php_version | version_compare('7.0', operator='>=' )
+
+- stat: path=/etc/php/7.0/apache2/conf.d/
+  register: php_7_0_apache2_conf_d
+
+- name: install Xdebug for php 7.0 and greater (Apache2)
+  shell: creates=/etc/php/7.0/apache2/conf.d/xdebug.ini ln -s /etc/php/7.0/mods-available/xdebug.ini /etc/php/7.0/apache2/conf.d/xdebug.ini
+  when: php_version | version_compare('7.0', operator='>=' ) and php_7_0_apache2_conf_d.stat.isdir is defined and php_7_0_apache2_conf_d.stat.isdir
+  notify:
+    - restart apache
+
+- stat: path=/etc/php/7.0/fpm/conf.d/
+  register: php_7_0_fpm_conf_d
+
+- name: install Xdebug for php 7.0 and greater (PHP-FPM)
+  shell: creates=/etc/php/7.0/fpm/conf.d/xdebug.ini ln -s /etc/php/7.0/mods-available/xdebug.ini /etc/php/7.0/fpm/conf.d/xdebug.ini
+  when: php_version | version_compare('7.0', operator='>=' ) and php_7_0_fpm_conf_d.stat.isdir is defined and php_7_0_fpm_conf_d.stat.isdir
+  notify:
+    - restart phpfpm
+
+- stat: path=/etc/php/7.0/cli/conf.d/
+  register: php_7_0_cli_conf_d
+
+- name: install Xdebug for php 7.0 and greater (PHP CLI)
+  shell: creates=/etc/php/7.0/cli/conf.d/xdebug.ini ln -s /etc/php/7.0/mods-available/xdebug.ini /etc/php/7.0/cli/conf.d/xdebug.ini
+  when: php_version | version_compare('7.0', operator='>=' ) and php_7_0_cli_conf_d.stat.isdir is defined and php_7_0_cli_conf_d.stat.isdir
+  notify:
+    - restart phpfpm

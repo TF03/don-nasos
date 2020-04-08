@@ -1,0 +1,59 @@
+#!/bin/bash
+#configuration settings
+POSTGRE_HOST=localhost
+POSTGRE_USER={{ pgdb_user }}
+POSTGRE_PASSWORD='{{ pgdb_password }}'
+POSTGRE_DB={{ pgdb_database }}
+STORAGE_FOLDER=/var/www/storage
+HOSTNAME={{ hostname }}
+TEMP_DIR=/tmp/backups
+BACKUPS_DAY=`date +%Y-%m-%d`
+DATE=`date +%d-%b-%Y_%H_%M_%Z`
+#Amazon S3 configuration settings
+AMAZON_BUCKET=venue-chain-backups
+AMAZON_BUCKET_LOCATION=US
+#hash generation
+SOLT=`openssl rand 100000 | sha1sum | awk -F ' ' '{print $1}'`
+HASH=`date +%H-%M`_`date +%s%N$SOLT | md5sum | awk '{print $1}'`
+####################################
+#backup MySQL database
+BACKUP_FOLDER=$TEMP_DIR/$HOSTNAME/$BACKUPS_DAY/$HASH
+if [ ! -d "$BACKUP_FOLDER" ]; then
+    mkdir -p $BACKUP_FOLDER
+fi
+
+echo 'Creating PostgreSQL backups...'
+cd $BACKUP_FOLDER
+if [ -f $POSTGRE_DB.sql ]; then
+   rm $POSTGRE_DB.sql
+fi
+db_backup_filename=$POSTGRE_DB'_'$DATE'.tar.gz'
+PGPASSWORD=$POSTGRE_PASSWORD pg_dump -U $POSTGRE_USER -h $POSTGRE_HOST $POSTGRE_DB > $POSTGRE_DB'.sql'
+tar -cf - $POSTGRE_DB.sql | gzip -9 > $db_backup_filename
+rm $POSTGRE_DB.sql
+
+#backup storage
+echo 'Creating storage backups...'
+cd $STORAGE_FOLDER'/../'
+storage_backup_filename=$DATE'_storage.tar.gz'
+tar -cf - storage/ | gzip -9 > $storage_backup_filename
+mv $storage_backup_filename $BACKUP_FOLDER
+
+cd $BACKUP_FOLDER
+md5sum * > MD5SUMS
+#mount amazon backet with s3fs
+echo 'Creating connection with Amazon S3...'
+umount /s3mnt
+if [ ! -d "/s3mnt" ]; then
+    mkdir -p /s3mnt
+fi
+chmod 777 /s3mnt
+s3fs $AMAZON_BUCKET /s3mnt
+
+echo 'Transfering backups to Amazon S3...'
+cp -Rf $TEMP_DIR/$HOSTNAME /s3mnt
+umount /s3mnt
+rm -Rf $TEMP_DIR
+echo 'Done.'
+
+

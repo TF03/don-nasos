@@ -1,0 +1,9 @@
+- name: install npm packages
+  shell: cd {{playbook_dir}}/../apps/admin/client && npm install
+  become: false
+  delegate_to: 127.0.0.1
+
+- name: build webpack
+  shell: cd {{playbook_dir}}/../apps/admin/client && npm run build
+  become: false
+  delegate_to: 127.0.0.1

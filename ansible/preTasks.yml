@@ -1,0 +1,21 @@
+---
+# Pre tasks
+- name: Install python for Ansible
+  raw: export DEBIAN_FRONTEND=noninteractive && test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
+  changed_when: False
+  tags: ['always']
+  when: is_dev
+
+- name: Install ifupdown
+  apt: pkg="ifupdown" state=present
+  changed_when: False
+  tags: ['always']
+
+- name: Gathering facts
+  setup:
+  tags: ['always']
+
+- name: Fix deb-src
+  become: true
+  shell: sed -i~orig -e 's/# deb-src/deb-src/' /etc/apt/sources.list && apt-get -y update
+  tags: ['always']

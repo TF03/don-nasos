@@ -1,0 +1,19 @@
+---
+- set_fact: ssl_installed=0
+- set_fact: installed_correct_ssl_version=0
+
+- name: determine current ssl version
+  shell: openssl version | head -n 2 | tail -n 1 | awk -F ' ' '{print $2}'
+  register: current_ssl_version
+
+- set_fact: ssl_installed=1
+  when: not current_ssl_version.stderr
+
+- set_fact: installed_correct_ssl_version=1
+  when: current_ssl_version.stdout|string == openssl_version|string
+
+#[WARNING]: Consider using apt module rather than running apt-get
+- name: update openssl
+  become: yes
+  shell: apt-get -y install --only-upgrade libssl1.0.0 openssl
+  when: installed_correct_ssl_version == '0'

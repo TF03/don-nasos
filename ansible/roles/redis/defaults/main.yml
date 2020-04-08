@@ -1,0 +1,4 @@
+---
+# defaults file for redis
+
+redis_version: 5.0.4

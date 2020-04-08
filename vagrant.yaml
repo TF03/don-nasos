@@ -1,0 +1,28 @@
+vm:
+  boot_timeout: 300
+  box: "ubuntu/bionic64"
+  box_url: "https://vagrantcloud.com/ubuntu/boxes/bionic64/versions/20190514.0.0/providers/virtualbox.box"
+  check_update: false
+  cpus: "auto"
+  memory: "1024"  # "auto" For autodetect (1/4 system memory)
+  cpuexecutioncap: "50"
+  name: "DonNasos"
+sync:
+  synced_folder: "." # or "/var/www/<project-name>"
+  vagrant_folder: "/var/www/dos-nasos" # or "/var/www/<project-name>"
+  second_synced_folder: ""
+  second_vagrant_folder: ""
+network:
+  private_ip: "192.168.31.11"
+  http_port: 8011
+host:
+  name: "dev.dos-nasos.local"
+  aliases: [
+    "frontend-dev.dos-nasos.local",
+    "backend-dev.dos-nasos.local",
+    "adminer-dev.dos-nasos.local",
+    "storage-dev.dos-nasos.local"
+  ]
+ansible:
+  playbook: "ansible/dev.yml"
+  inventory_path: "ansible/dev"

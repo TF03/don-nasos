@@ -1,0 +1,12 @@
+---
+
+- name: install logrotate
+  apt: pkg=logrotate state=present
+
+- name: install scripts
+  template: src=logrotate.j2 dest="{{ logrotate_dir }}/{{ item.name }}"
+  with_items: "{{ logrotate_scripts }}"
+
+- name: init logrotate scripts
+  shell: logrotate -f /etc/logrotate.d/{{ item.name }}
+  with_items: "{{ logrotate_scripts }}"

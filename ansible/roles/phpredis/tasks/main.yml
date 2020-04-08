@@ -1,0 +1,44 @@
+---
+# tasks file for phpredis
+- name: detect php version
+  shell: chdir=/tmp php -v | grep -Eow '^PHP [^ ]+'| awk '{ print $2 }' | awk -F '-' '{print $1}'
+  register: php_version_command
+
+- set_fact: php_version="{{ php_version_command.stdout.split('.') }}"
+
+- set_fact: php_version="{{ [php_version[0], php_version[1]]|join('.') }}"
+
+- name: download PhpRedis
+  get_url: url="{{phpredis_download_lib_url}}{{phpredis_lib_branch}}.zip" dest=/tmp/phpredis.zip force=yes
+
+- name: compile PhpRedis
+  shell: chdir=/tmp creates=/tmp/phpredis/modules/redis.so unzip -o /tmp/phpredis.zip && mv /tmp/phpredis-* /tmp/phpredis && cd /tmp/phpredis && phpize && ./configure && make && make install
+
+- name: install PhpRedis for php 5.5 and greater
+  shell: creates="/etc/php/{{ php_version }}/mods-available/redis.ini" touch "/etc/php/{{ php_version }}/mods-available/redis.ini" && echo extension=redis.so > "/etc/php/{{ php_version }}/mods-available/redis.ini"
+  when: php_version | version_compare('5.5', operator='>=' )
+
+- stat: path="/etc/php/{{ php_version }}/apache2/conf.d/"
+  register: php_apache2_conf_d
+
+- name: install PhpRedis for php 5.5 and greater (Apache2)
+  shell: creates=/etc/php/{{ php_version }}/apache2/conf.d/redis.ini ln -s /etc/php/{{ php_version }}/mods-available/redis.ini /etc/php/{{ php_version }}/apache2/conf.d/redis.ini
+  when: php_version | version_compare('5.5', operator='>=' ) and php_apache2_conf_d.stat.isdir is defined and php_apache2_conf_d.stat.isdir
+  notify:
+    - restart apache
+
+- stat: path="/etc/php/{{ php_version }}/fpm/conf.d/"
+  register: php_fpm_conf_d
+
+- name: install PhpRedis for php 5.5 and greater (PHP-FPM)
+  shell: creates=/etc/php/{{ php_version }}/fpm/conf.d/redis.ini ln -s /etc/php/{{ php_version }}/mods-available/redis.ini /etc/php/{{ php_version }}/fpm/conf.d/redis.ini
+  when: php_version | version_compare('5.5', operator='>=' ) and php_fpm_conf_d.stat.isdir is defined and php_fpm_conf_d.stat.isdir
+  notify:
+    - restart php-fpm
+
+- stat: path="/etc/php/{{ php_version }}/cli/conf.d/"
+  register: php_cli_conf_d
+
+- name: install PhpRedis for php 5.5 and greater (PHP CLI)
+  shell: creates=/etc/php/{{ php_version }}/cli/conf.d/redis.ini ln -s /etc/php/{{ php_version }}/mods-available/redis.ini /etc/php/{{ php_version }}/cli/conf.d/redis.ini
+  when: php_version | version_compare('5.5', operator='>=' ) and php_cli_conf_d.stat.isdir is defined and php_cli_conf_d.stat.isdir

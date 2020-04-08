@@ -1,0 +1,22 @@
+- hosts: dev
+  remote_user: vagrant
+  become: true
+  gather_facts: false
+  pre_tasks:
+    - include: preTasks.yml
+  vars_files:
+    - "vars/dev.yml"
+  roles:
+    - initial
+    - ntpd
+    - php-ubuntu
+    - redis
+    - phpredis
+#    - mysql
+#    - postgresql
+    - adminer
+    - nginx
+#    - xdebug
+    - composer
+    - logrotate
+#    - finally

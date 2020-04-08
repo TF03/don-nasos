@@ -1,0 +1,14 @@
+---
+# tasks file for initial
+
+- name: set hostname
+  shell: hostname "{{ hostname }}"
+  ignore_errors: yes
+
+- name: Update apt cache
+  become: yes
+  apt: update_cache=yes
+
+- name: be sure system packages are installed
+  apt: pkg="{{ item }}" state=present
+  with_items: "{{ packages }}"

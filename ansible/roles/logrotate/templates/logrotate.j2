@@ -1,0 +1,36 @@
+# {{ ansible_managed }}
+
+{{ item.path }} {
+{{ item.frequency|default(logrotate_frequency) }}
+{% if item.missingok|default(logrotate_missingok) == true  -%}
+missingok
+{% endif %}
+rotate {{ item.files_num|default(logrotate_files_num) }}
+{% if item.compress|default(logrotate_compress) == true  -%}
+compress
+{% endif %}
+{% if item.delaycompress|default(logrotate_delaycompress) == true  -%}
+delaycompress
+{% endif %}
+{% if item.copytruncate|default(logrotate_copytruncate) == true  -%}
+copytruncate
+{% endif %}
+{% if item.notifempty|default(logrotate_notifempty) == true  -%}
+notifempty
+{% endif %}
+create {{ item.chmod|default(logrotate_chmod) }}
+{% if item.sharedscripts|default(logrotate_sharedscripts) == true  -%}
+sharedscripts
+{% endif %}
+
+{% if item.prerotate is defined %}
+prerotate
+    {{ item.prerotate }}
+endscript
+{% endif %}
+{% if item.postrotate is defined %}
+postrotate
+    {{ item.postrotate }}
+endscript
+{% endif %}
+}

@@ -1,0 +1,13 @@
+---
+# tasks file for ntpd
+
+- name: be sure ntp is installed
+  apt: pkg=ntp state=present
+
+- name: be sure ntp is configured
+  template: src="{{ ntpd_template_src_file }}" dest=/etc/ntp.conf
+  notify:
+    - restart ntpd
+
+- name: be sure ntpd is started and enabled
+  service: name=ntp state=started enabled=yes

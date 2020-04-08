@@ -1,0 +1,2 @@
+- name: crontab
+  template: src={{ crontab_template_src_file }} dest=/etc/crontab

@@ -1,0 +1,7 @@
+server
+{
+    include     ports/http.conf;
+    server_name {{ item.server_name }};
+
+    return      {% if (item.redirect_code is defined) %}{{item.redirect_code}}{% else %}301{% endif %} {% if (item.redirect_schema is defined) %}{{item.redirect_schema}}{% else %}http{% endif %}://{{ item.redirect_to_domain }}$request_uri;
+}

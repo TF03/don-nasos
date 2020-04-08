@@ -1,0 +1,28 @@
+---
+# tasks file for composer
+
+- set_fact: composer_installed=0
+
+- name: determine current composer version
+  become: no
+  shell: composer -V | head -n 1 | awk -F ' ' '{print $3}'
+  register: current_composer_version
+
+- set_fact: composer_installed=1
+  when: not current_composer_version.stderr
+
+- name: download Composer
+  shell: creates="composer.phar" chdir="/tmp" curl -s http://getcomposer.org/installer | php
+  when: composer_installed == '0'
+
+- name: install Composer globally
+  shell: creates="/usr/local/bin/composer" chdir="/tmp" mv composer.phar /usr/local/bin/composer
+  when: composer_installed == '0'
+
+- name: make composer executable
+  shell: chmod a+x /usr/local/bin/composer
+  when: composer_installed == '0'
+
+- name: make composer self-update
+  shell: composer self-update
+  when: composer_installed == '1'

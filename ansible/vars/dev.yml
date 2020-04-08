@@ -1,0 +1,117 @@
+hostname: dev.dos-nasos.local
+project_folder: /var/www/dos-nasos
+is_dev: true
+is_production: false
+
+packages: [
+  git-core,
+  curl,
+  wget,
+  htop,
+  python-psycopg2,
+  python3-psycopg2,
+  python3-pygresql,
+  libpq-dev,
+  unzip,
+  zip,
+  expect-dev,
+  mc
+]
+
+# PHP
+php_v: "7.4"
+php_error_reporting: E_ALL
+php_display_errors: Off
+php_upload_max_filesize: 30M
+php_post_max_size: 35M
+php_max_execution_time: 60
+php_memory_limit: 128M
+php_file_uploads: On
+php_max_file_uploads: 20
+php_packages: [
+  "php{{ php_v }}-fpm",
+  "php{{ php_v }}-dev",
+  "php{{ php_v }}-cli",
+  "php{{ php_v }}-mysql",
+  "php{{ php_v }}-curl",
+  "php{{ php_v }}-gd",
+#  "php{{ php_v }}-mcrypt",
+  "php{{ php_v }}-mbstring",
+  "php{{ php_v }}-intl",
+  "php{{ php_v }}-dom",
+  "php{{ php_v }}-xml",
+  "php{{ php_v }}-zip",
+  "php{{ php_v }}-soap",
+  "php{{ php_v }}-ssh2",
+  "php{{ php_v }}-opcache",
+  "php{{ php_v }}-apcu"
+]
+
+# phpredis
+phpredis_lib_branch: 3.1.6
+
+# mysql
+mysql_config_src_file: my.cnf.j2 # Path of a Jinja2 formatted template on the local server. This can be a relative or absolute path.
+mysql_root_pass_config_src_file: root_pass_my.cnf.j2 # Path of a Jinja2 formatted template on the local server. This can be a relative or absolute path.
+mysql_bind_address: 127.0.0.1
+mysql_root_pass: mysecretpass
+mysql_client_port: 3306
+mysql_mysqld_port: 3306
+mysql_database_encoding: utf8
+mysql_database_collation: utf8_general_ci
+mysql_app_user: don_nasos
+mysql_app_pass: pass
+mysql_databases: [
+  don_nasos,
+]
+
+# adminer
+adminer_ver: 4.2.5
+adminer_path: '/usr/share/adminer'
+adminer_clean_directory: false
+adminer_css_theme_url: ''
+# For example: https://raw.githubusercontent.com/arcs-/Adminer-Material-Theme/master/adminer.css
+# For more details: https://www.adminer.org/#extras
+
+#Nginx
+nginx_version: 1.14.0
+nginx_user: nginx
+nginx_group: nginx
+nginx_run_user: 'www-data'
+nginx_worker_processes: 1 # recomended: grep processor /proc/cpuinfo | wc -l
+nginx_worker_connections: 1024 # recomended: ulimit -n
+nginx_client_max_body_size: 35M
+nginx_keepalive_requests: 60
+nginx_keepalive_timeout: 100
+nginx_client_header_timeout: 25
+nginx_client_body_timeout: 25
+nginx_send_timeout: 25
+nginx_fastcgi_connect_timeout: 65
+nginx_fastcgi_send_timeout: 65
+nginx_php_unix_socket: /var/run/php/php{{ php_v }}-fpm.sock
+nginx_ngx_ssl_bufsize: 1400
+nginx_basic_vhosts: [
+    { server_name: '_', root: '{{ project_folder }}/public', template: 'catch_all_yii'},
+    { server_name: 'frontend-{{ hostname }}', root: '{{ project_folder }}/public', template: 'yii'},
+    { server_name: 'backend-{{ hostname }}', root: '{{ project_folder }}/public_admin', template: 'yii'},
+    { server_name: 'storage-{{ hostname }}', root: '/var/www/storage', template: 'static'},
+    { server_name: 'adminer-{{ hostname }}', root: '{{ adminer_path }}', template: 'php' },
+]
+nginx_3rd_party_modules: [
+    { name: 'headers-more-nginx-module', version: "0.33", archive_name: "headers-more-nginx-module.tar.gz", url: "https://github.com/openresty/headers-more-nginx-module/archive/v0.33.tar.gz" },
+]
+
+upload_folder: /var/www/storage
+
+logrotate_scripts: [
+{
+  name: "nginx",
+  path: "/var/log/nginx/*.log /var/log/nginx/*/*.log",
+  postrotate: "[ -s /run/nginx.pid ] && kill -USR1 `cat /run/nginx.pid`"
+}
+]
+
+# xdebug
+xdebug:
+  remote_port: 9000
+  remote_host: 192.168.33.1

@@ -1,0 +1,8 @@
+---
+# defaults file for ntpd
+
+ntpd_template_src_file: ntp.conf.j2 # Path of a Jinja2 formatted template on the local server. This can be a relative or absolute path.
+ntp_server0: 0.pool.ntp.org
+ntp_server1: 1.pool.ntp.org
+ntp_server2: 2.pool.ntp.org
+ntp_server3: 3.pool.ntp.org

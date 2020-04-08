@@ -1,0 +1,23 @@
+server
+{
+    include     ports/http.conf;
+    server_name www.{{ item.server_name }};
+    return      301 http://{{ item.server_name }}$request_uri;
+}
+server
+{
+    server_name {{ item.server_name }};
+
+    include         ports/http.conf;
+	include         locations/static.conf;
+
+    {% if (item.basic_auth is defined) and (item.basic_auth is sameas true) %}
+    auth_basic "Restricted";
+    auth_basic_user_file {{ nginx_http_basic_auth_file }};
+    {% endif %}
+
+    location / {
+        stub_status;
+    }
+}
+

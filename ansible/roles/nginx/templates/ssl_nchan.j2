@@ -1,0 +1,102 @@
+server
+{
+    server_name {{ item.server_name }};
+
+    error_log  /var/log/nginx/{{ item.server_name }}/error.log;
+    access_log /var/log/nginx/{{ item.server_name }}/access.log;
+
+    listen 443 ssl;
+    {% if (item.path_to_ssl_certificate_file is defined) %}
+        ssl_certificate    {{ item.path_to_ssl_certificate_file }};
+	{% else %}
+        ssl_certificate    {{ nginx_certs_folder }}{{ item.ssl_certificate_file }};
+    {% endif %}
+
+    {% if (item.path_to_ssl_certificate_key_file is defined) %}
+        ssl_certificate_key    {{ item.path_to_ssl_certificate_key_file }};
+    {% else %}
+        ssl_certificate_key {{ nginx_certs_folder }}{{ item.ssl_certificate_key_file }};
+    {% endif %}
+
+    {% if (item.path_to_ssl_dhparam_file is defined) %}
+        ssl_dhparam    {{ item.path_to_ssl_dhparam_file }};
+	{% else %}
+        ssl_dhparam    {{ nginx_certs_folder }}{{ item.ssl_dhparam_file }};
+    {% endif %}
+
+    {% if (item.basic_auth is defined) and (item.basic_auth is sameas true) %}
+    auth_basic "Restricted";
+    auth_basic_user_file {{ nginx_http_basic_auth_file }};
+    {% endif %}
+
+    location ~ /sub/lastUpdates/(\w+)$ {
+      nchan_pubsub;
+      nchan_channel_id "lastUpdates/$1" "lastUpdates";
+
+      nchan_group_max_subscribers 5;
+      nchan_store_messages off;
+      nchan_message_buffer_length 0;
+
+      nchan_unsubscribe_request /upstream/unsub;
+      nchan_subscribe_request /upstream/sub;
+
+      nchan_websocket_ping_interval 30;
+      nchan_websocket_client_heartbeat _ping _pong;
+    }
+
+    location = /pub/lastUpdates {
+      nchan_publisher;
+      nchan_channel_id "lastUpdates";
+
+      nchan_store_messages off;
+      nchan_message_buffer_length 0;
+    }
+
+    location ~ /pub/lastUpdates/(\w+)$ {
+      nchan_publisher;
+      nchan_channel_id "lastUpdates/$1";
+
+      nchan_store_messages off;
+      nchan_message_buffer_length 0;
+    }
+
+    location ~ /sub/account/(.*)$ {
+      nchan_subscriber;
+      nchan_channel_id "account/$1";
+      nchan_group_max_subscribers 5;
+      nchan_unsubscribe_request /upstream/unsub;
+      nchan_subscribe_request /upstream/sub;
+    }
+
+    location ~ /pub/account/(.*)$ {
+      nchan_publisher;
+      nchan_channel_id "account/$1";
+
+      nchan_store_messages off;
+      nchan_message_buffer_length 0;
+    }
+
+    location = /upstream/unsub {
+      proxy_pass https://api-{{ hostname }}/api/wsCallback/unsubscribe;
+      proxy_ignore_client_abort on;
+      proxy_set_header X-Subscriber-Type $nchan_subscriber_type;
+      proxy_set_header X-Subscriber-Addr $remote_addr;
+      proxy_set_header X-Channel-Id $nchan_channel_id;
+      proxy_set_header X-Original-URI $request_uri;
+    }
+
+    location = /upstream/sub {
+      proxy_pass https://api-{{ hostname }}/api/wsCallback/subscribe;
+      proxy_set_header X-Subscriber-Type $nchan_subscriber_type;
+      proxy_set_header X-Subscriber-Addr $remote_addr;
+      proxy_set_header X-Message-Id $nchan_message_id;
+      proxy_set_header X-Channel-Id $nchan_channel_id;
+      proxy_set_header X-Original-URI $request_uri;
+    }
+
+    {% if (item.enable_status is defined) and (item.enable_status is sameas true) %}
+    location /status {
+        nchan_stub_status;
+    }
+    {% endif %}
+}

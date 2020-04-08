@@ -1,0 +1,54 @@
+server
+{
+    include     ports/http.conf;
+    server_name www.{{ item.server_name }};
+    return      301 http://{{ item.server_name }}$request_uri;
+}
+server
+{
+    server_name {{ item.server_name }};
+    root        {{ item.root }};
+
+    include         ports/http.conf;
+    include         limits/methods.conf;
+    include         locations/favicon.conf;
+    include         locations/favicon_apple.conf;
+	include         locations/static.conf;
+    include         locations/php.conf;
+
+
+    {% if (item.basic_auth is defined) and (item.basic_auth is sameas true) %}
+    auth_basic "Restricted";
+    auth_basic_user_file {{ nginx_http_basic_auth_file }};
+    {% endif %}
+
+    ########## Your custom locations & settings ##########
+	location / {
+		index index.php index.html index.htm;
+		try_files $uri $uri/ /index.php$is_args$args;
+	}
+
+	location ~ ^/(protected|framework|themes/\w+/views) {
+		deny  all;
+		access_log off;
+        log_not_found off;
+	}
+
+	#avoid processing of calls to unexisting static files by yii
+	location ~ \.(js|css|png|jpg|gif|swf|ico|pdf|mov|fla|zip|rar)$ {
+		try_files $uri =404;
+	}
+
+	# prevent nginx from serving dotfiles (.htaccess, .svn, .git, etc.)
+	location ~ /\. {
+		deny all;
+		access_log off;
+		log_not_found off;
+	}
+
+    location ~ /\.ht {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+}
