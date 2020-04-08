@@ -13,7 +13,6 @@
     - redis
     - phpredis
 #    - mysql
-#    - postgresql
     - adminer
     - nginx
 #    - xdebug
