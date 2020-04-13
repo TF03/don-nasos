@@ -12,6 +12,8 @@ class TestController extends BaseController
      * @Route("/test",
      *     name="test"
      * )
+     * @param Request $request
+     * @return Response
      */
     public function getTestAction(Request $request): Response
     {

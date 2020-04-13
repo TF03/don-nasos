@@ -12,6 +12,8 @@ class TestController extends BaseAdminController
      * @Route("/test",
      *     name="test"
      * )
+     * @param Request $request
+     * @return Response
      */
     public function getTestAction(Request $request): Response
     {
